@@ -1,0 +1,6 @@
+.venv/
+.env
+*.ipynb
+fonts/*.pkl
+texts/*.txt
+texts/*.pdf
