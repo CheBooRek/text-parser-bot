@@ -10,10 +10,10 @@ class TextParser(object):
     def __init__(self):
         pass
     
-    def __call__(self, url, filename=None):
+    def __call__(self, url, unique=False, filename=None):
         """Run text parser logic"""
         html = self.download_html(url)
-        text = self.extract_text_from_html(html)
+        text = self.extract_text_from_html(html, unique)
         
         if filename:
             self.write_to_file(text, filename)
@@ -29,7 +29,7 @@ class TextParser(object):
 
         return response.text
     
-    def extract_text_from_html(self, html):
+    def extract_text_from_html(self, html, unique=False):
         """Extract all text from the HTML content."""
         soup = BeautifulSoup(html, 'html.parser')
 
@@ -49,6 +49,9 @@ class TextParser(object):
             line = ' '.join([phrase.strip() for phrase in line_raw.split("  ") if phrase])
             if line:
                 lines.append(line)
+
+        if unique:
+            lines = [*dict.fromkeys(lines)]
 
         print('Text extracted!')
 
