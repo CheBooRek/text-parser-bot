@@ -1,24 +1,37 @@
 import os
 import requests
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, SoupStrainer
+from urllib.parse import urljoin
 from fpdf import FPDF
 
 
 class TextParser(object):
     
-    def __init__(self):
-        pass
+    def __init__(self, url, file_format='pdf'):
+        
+        self.url = url
+        self.file_format = file_format
+        self.texts = []
     
-    def __call__(self, url, unique=False, filename=None):
+    def __call__(self, filename=None, unique=False):
         """Run text parser logic"""
-        html = self.download_html(url)
+        html = self.download_html(self.url)
         text = self.extract_text_from_html(html, unique)
         
         if filename:
-            self.write_to_file(text, filename)
+            self.write_to_file(text, filename, self.file_format)
         else:
             return text
+        
+    def _validate_link(self, link, internal_only=False):
+
+        pat = self.url if internal_only else 'http'
+    
+        if link.startswith(pat) and link.find('#') == -1:
+            return link
+        elif link.startswith('/') and link.find('#') == -1:
+            return urljoin(self.url, link)
 
     def download_html(self, url):
         """Download the HTML content of the given URL."""
@@ -57,6 +70,21 @@ class TextParser(object):
 
         return lines
     
+    def get_html_links(self, html, internal_only=False):
+
+        links = []
+        soup = BeautifulSoup(html, 'html.parser', parse_only=SoupStrainer('a'))
+
+        for link in soup:
+            if link.has_attr('href'):
+                href = self._validate_link(link['href'], internal_only)
+                if href:
+                    links.append(href)
+
+        links = [*dict.fromkeys(links)]
+
+        return links
+    
     @staticmethod
     def write_to_file(lines, filename, file_format='pdf'):
         """Write parsed text to file on provided path"""
@@ -88,11 +116,12 @@ class TextParser(object):
 def main():
     # Input URL from the user
     url = input("Enter the URL of the page: ")
-    filepath = input('Enter filename to save: ')
+    filename = input('Enter filename to save: ')
+    file_format = input('Choose file format (pdf/txt): ')
     
     try:
-        text_parser = TextParser()
-        text_parser(url, filepath=filepath)
+        text_parser = TextParser(url=url, file_format=file_format)
+        text_parser(filename=filename, unique=True)
     
     except requests.RequestException as e:
         print(f"Error downloading the page: {e}")
