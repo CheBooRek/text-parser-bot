@@ -3,13 +3,13 @@ import re
 import requests
 
 from bs4 import BeautifulSoup, SoupStrainer
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from fpdf import FPDF
-
+    
 
 class TextParser(object):
     
-    def __init__(self, url, file_format='pdf'):
+    def __init__(self, url=None, file_format='pdf'):
         
         self.url = url
         self.file_format = file_format
@@ -17,7 +17,13 @@ class TextParser(object):
         self.headers = {
             "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
+            }
+
+    def set_url(self, url):
+        self.url = url
+
+    def set_file_format(self, file_format):
+        self.file_format = file_format
     
     def __call__(self, filename=None, unique=False):
         """Run text parser logic"""
@@ -28,6 +34,21 @@ class TextParser(object):
             self.write_to_file(text, filename, self.file_format)
         else:
             return text
+        
+    @staticmethod
+    def _validate_link(href, base_url, internal_only=False):
+
+        full_url = urljoin(base_url, href)
+        flags = [
+            full_url.find('#') == -1,
+            urlparse(full_url).netloc != ''
+        ]
+        
+        if internal_only:
+            flags.append(urlparse(full_url).netloc == urlparse(base_url).netloc)
+        
+        if all(flags):
+            return full_url
         
     @staticmethod
     def _remove_emojis(data):
@@ -52,15 +73,6 @@ class TextParser(object):
             u"\xa0" # blanks
                         "]+", re.UNICODE)
         return re.sub(emoj, '', data)
-        
-    def _validate_link(self, link, internal_only=False):
-
-        pat = self.url if internal_only else 'http'
-    
-        if link.startswith(pat) and link.find('#') == -1:
-            return link
-        elif link.startswith('/') and link.find('#') == -1:
-            return urljoin(self.url, link)
 
     def download_html(self, url):
         """Download the HTML content of the given URL."""
@@ -101,16 +113,17 @@ class TextParser(object):
     
     def get_html_links(self, html, internal_only=False):
 
-        links = []
+        links = set()
         soup = BeautifulSoup(html, 'html.parser', parse_only=SoupStrainer('a'))
+        base_url = urlparse(self.url).scheme + "://" + urlparse(self.url).netloc
 
         for link in soup:
             if link.has_attr('href'):
-                href = self._validate_link(link['href'], internal_only)
+                href = self._validate_link(link['href'], base_url, internal_only)
                 if href:
-                    links.append(href)
-
-        links = [*dict.fromkeys(links)]
+                    links.add(href)
+                    
+        links.difference_update({base_url}) # drop self-link
 
         return links
     

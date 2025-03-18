@@ -5,4 +5,5 @@ __pycache__/
 fonts/*.pkl
 texts/*.txt
 texts/*.pdf
+texts/*.zip
 logs/*.log
