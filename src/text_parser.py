@@ -5,15 +5,6 @@ import requests
 from bs4 import BeautifulSoup, SoupStrainer
 from urllib.parse import urljoin, urlparse
 from fpdf import FPDF
-
-
-def validate_url(txt):
-
-    try:
-        url = urlparse(txt)
-        return url
-    except:
-        return None
     
 
 class TextParser(object):
@@ -44,14 +35,20 @@ class TextParser(object):
         else:
             return text
         
-    def _validate_link(self, link, internal_only=False):
+    @staticmethod
+    def _validate_link(href, base_url, internal_only=False):
 
-        pat = self.url if internal_only else 'http'
-    
-        if link.startswith(pat) and link.find('#') == -1:
-            return link
-        elif link.startswith('/') and link.find('#') == -1:
-            return urljoin(self.url, link)
+        full_url = urljoin(base_url, href)
+        flags = [
+            full_url.find('#') == -1,
+            urlparse(full_url).netloc != ''
+        ]
+        
+        if internal_only:
+            flags.append(urlparse(full_url).netloc == urlparse(base_url).netloc)
+        
+        if all(flags):
+            return full_url
         
     @staticmethod
     def _remove_emojis(data):
@@ -116,16 +113,17 @@ class TextParser(object):
     
     def get_html_links(self, html, internal_only=False):
 
-        links = []
+        links = set()
         soup = BeautifulSoup(html, 'html.parser', parse_only=SoupStrainer('a'))
+        base_url = urlparse(self.url).scheme + "://" + urlparse(self.url).netloc
 
         for link in soup:
             if link.has_attr('href'):
-                href = self._validate_link(link['href'], internal_only)
+                href = self._validate_link(link['href'], base_url, internal_only)
                 if href:
-                    links.append(href)
-
-        links = [*dict.fromkeys(links)]
+                    links.add(href)
+                    
+        links.difference_update({base_url}) # drop self-link
 
         return links
     
